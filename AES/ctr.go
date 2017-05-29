@@ -35,6 +35,37 @@ func (c *CTR) Encrypt(plain []byte, key []byte) ([]byte, error) {
 
 }
 
+// EncryptWithIV uses a []byte 'key' to encrypt []byte 'plaintext'
+// using the Counter mode of AES, and Initialization Vector []byte 'iv'
+// Only use this method if the IV if you need a non-random vector
+func (c *CTR) EncryptWithIV(plain []byte, key []byte, iv []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+  	if err != nil {
+  		panic(err)
+  	}
+      if len(iv) < aes.BlockSize {
+        var message bytes.Buffer
+        message.WriteString("Invalid IV: \r\n AES requires an Initialization Vector of ")
+	    message.WriteString(string(aes.BlockSize)) 
+        message.WriteString("bytes, but received an IV of only ")
+        message.WriteString(string(len(iv)))
+        message.WriteString("bytes. ")
+        return nil, Errors.NewCryptoError(Errors.InsufficientIVLength, message.String())
+    }
+
+    
+
+  	ciphertext := make([]byte, aes.BlockSize+len(plain))
+  
+  
+  	stream := cipher.NewCTR(block, iv)
+  	stream.XORKeyStream(ciphertext[aes.BlockSize:], plain)
+    return ciphertext, nil
+
+}
+
+
+
 // Decrypt uses []byte 'key' to Decrypt
 // []byte 'ciphertext' using the Counter
 // mode of AES

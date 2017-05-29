@@ -8,7 +8,7 @@ import (
 	"strings"
 	"github.com/urfave/cli"
 
-	 
+	 "github.com/SCKelemen/rex/Errors"
    router "github.com/SCKelemen/rex/router"
 )
 
@@ -16,7 +16,54 @@ func main() {
 	app := cli.NewApp()
   app.Name = "rex"
   r := router.NewRouter(nil)
+  
+  var config Settings
 
+
+  app.Flags = []cli.Flag {
+    cli.StringFlag{
+      Name:        "mode, m",
+      Value:       "ctr",
+      Usage:       "Cipher Mode",
+      Destination: &config.mode,
+    },
+    cli.StringFlag{
+      Name:        "key, k",
+      Value:       "",
+      Usage:       "Encryption/Decryption key",
+      Destination: &config.key, 
+    },
+    cli.StringFlag{
+      Name:        "keyfile, kf",
+      Value:       "",
+      Usage:       "Path to KeyFile containing Encryption/Decryption key",
+      Destination: &config.keyfile,
+    },
+    cli.StringFlag{
+      Name:        "plaintext, plain, p",
+      Value:       "",
+      Usage:       "Plaintext to encrypt",
+      Destination: &config.plaintext,
+    },
+    cli.StringFlag{
+      Name:        "plaintextfile, plainfile, pf",
+      Value:       "",
+      Usage:       "Path to file containing plaintext to encrypt",
+      Destination: &config.plaintextfile,
+    },
+    cli.StringFlag{
+      Name:        "ciphertext, cipher, c",
+      Value:       "",
+      Usage:       "Ciphertext to decrypt",
+      Destination: &config.ciphertext,
+    },
+    cli.StringFlag{
+      Name:        "ciphertextfile, cipherfile, cf",
+      Value:       "",
+      Usage:       "Path to file containing ciphertext to decrypt",
+      Destination: &config.mode,
+    },
+  }
 
  	app.Commands = []cli.Command{
 	{
@@ -27,14 +74,17 @@ func main() {
           Name:  "encrypt",
           Usage: "Encrypts a files with AES",
           Action: func(c *cli.Context) error {
-            k := []byte("example key 1234")
-            cip := r.NewAESRouter().CTR.Encrypt([]byte("hello string"), k)
-             p := r.NewAESRouter().CTR.Decrypt(cip, k)
-           //plain := r.NewAESRouter().CTR.Decrypt(cipher, []byte("example key 1234"))
-             fmt.Printf("cipher: %s\n", cip)
-              fmt.Printf("plain: %s\n", p)
-
-  
+            params, err := getEncryptionParameters(config)
+            DealWith(err)
+            var ciphertext []byte
+            if params.iv != "" {
+              ciphertext, err = r.NewAESRouter().CTR.EncryptWithIV([]byte(params.plain), []byte(params.key), []byte(params.iv))
+              DealWith(err)
+            }
+            ciphertext, err = r.NewAESRouter().CTR.Encrypt([]byte(params.plain), []byte(params.key))
+            DealWith(err)
+            fmt.Printf("%s\n", ciphertext)
+               
             return nil
           },
         },
@@ -42,7 +92,18 @@ func main() {
           Name:  "decrypt",
           Usage: "Decrypts",
           Action: func(c *cli.Context) error {
-            fmt.Println("decrypting file: ", c.Args().First())
+
+            params, err := getDecryptionParameters(config)
+            DealWith(err)
+            var plaintext []byte
+            if params.iv != "" {
+              plaintext, err = r.NewAESRouter().CTR.DecryptWithIV([]byte(params.plain), []byte(params.key), []byte(params.iv))
+              DealWith(err)
+            }
+            plaintext, err = r.NewAESRouter().CTR.Decrypt([]byte(params.plain), []byte(params.key))
+            DealWith(err)
+            fmt.Printf("%s\n", plaintext)
+
             return nil
           },
         },	 
@@ -139,4 +200,104 @@ func (d *Decryptor) Decrypt(v interface{}) error {
 }
 
 
+
+type Settings struct {
+  mode            string
+  key             string
+  keyfile         string
+  iv              string
+  ivfile          string
+  plaintext       string
+  plaintextfile   string
+  ciphertext      string
+  ciphertextfile  string
+}
+
+
+func getEncryptionParameters(config Settings) ( EncryptionParameters, error) {
+  var params EncryptionParameters
+
+  params.key = config.keyfile
+  if params.key == "" {
+    params.key = config.key
+  }
+  if params.key == "" {
+    return params, Errors.NewAppError(Errors.NoKeyorKeyfile, "No Key or Key Provided")
+  }
+  params.plain = config.plaintextfile
+  if params.plain == "" {
+    params.plain = config.plaintext
+  }
+  if params.plain == "" {
+    return params, Errors.NewAppError(Errors.NoPlaintextorPlaintextfile, "No Plaintext or Plaintextfile Provided")
+  }
+
+  params.cipher = config.ciphertextfile
+  if params.cipher == "" {
+    params.cipher = "stdout"
+    println("No output file provided; defaulting to stdout")
+  }
+
+  switch config.mode {
+    default:
+      println("Using Counter Mode")
+      params.mode = "ctr"
+      break;
+  }
+  
+  params.iv = config.ivfile
+  if params.iv == "" {
+    params.iv = config.iv
+  }
+
+  return params, nil
+}
+
+func getDecryptionParameters(config Settings) ( EncryptionParameters, error) {
+  var params EncryptionParameters
+
+  params.key = config.keyfile
+  if params.key == "" {
+    params.key = config.key
+  }
+  if params.key == "" {
+    return params, Errors.NewAppError(Errors.NoKeyorKeyfile, "No Key or Key Provided")
+  }
+  params.cipher = config.ciphertextfile
+  if params.cipher == "" {
+    params.cipher = config.ciphertext
+  }
+  if params.cipher == "" {
+    return params, Errors.NewAppError(Errors.NoCiphertextorCiphertextfile, "No Ciphertext or Ciphertextfile Provided")
+  }
+
+  params.plain = config.plaintextfile
+  if params.plain == "" {
+    params.plain = "stdout"
+    println("No output file provided; defaulting to stdout")
+  }
+
+  switch config.mode {
+    default:
+      println("Using Counter Mode")
+      params.mode = "ctr"
+      break;
+  }
+  
+  params.iv = config.ivfile
+  if params.iv == "" {
+    params.iv = config.iv
+  }
+
+  return params, nil
+}
+
+
+type EncryptionParameters struct {
+  mode      string
+  key       string
+  iv        string
+  plain     string
+  cipher    string
+}
 
