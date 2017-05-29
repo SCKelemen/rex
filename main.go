@@ -72,6 +72,7 @@ func main() {
       Subcommands: []cli.Command{
         {
           Name:  "encrypt",
+          Category: "AES",
           Usage: "Encrypts a files with AES",
           Action: func(c *cli.Context) error {
             params, err := getEncryptionParameters(config)
@@ -90,6 +91,7 @@ func main() {
         },
         {
           Name:  "decrypt",
+          Category: "AES",
           Usage: "Decrypts",
           Action: func(c *cli.Context) error {
 
