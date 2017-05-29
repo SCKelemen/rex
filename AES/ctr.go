@@ -4,8 +4,8 @@ import (
   	"crypto/aes"
   	"crypto/cipher"
   	"crypto/rand"
-
-  	"fmt"
+    "github.com/SCKelemen/rex/Errors"
+    "bytes"
   	"io"
   )
 
@@ -17,38 +17,57 @@ type CTR struct {
 
 // Encrypt uses a []byte 'key' to encrypt []byte 'plaintext'
 // using the Counter mode of AES
-func (c *CTR) Encrypt(plaintext []byte, key []byte) []byte {
-
-  	block, err := aes.NewCipher(key)
+func (c *CTR) Encrypt(plain []byte, key []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
   	if err != nil {
   		panic(err)
   	}
-  
-  	// The IV needs to be unique, but not secure. Therefore it's common to
-  	// include it at the beginning of the ciphertext.
-  	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+
+  	ciphertext := make([]byte, aes.BlockSize+len(plain))
   	iv := ciphertext[:aes.BlockSize]
   	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
   		panic(err)
   	}
   
   	stream := cipher.NewCTR(block, iv)
-  	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-  
-  
-  
-  	fmt.Printf("%s\n", plaintext)
-    return plaintext
-  
+  	stream.XORKeyStream(ciphertext[aes.BlockSize:], plain)
+    return ciphertext, nil
+
 }
 
 // Decrypt uses []byte 'key' to Decrypt
 // []byte 'ciphertext' using the Counter
 // mode of AES
-func (c *CTR) Decrypt(ciphertext []byte, key []byte) []byte {
-    return c.Encrypt(ciphertext, key)
+func (c *CTR) Decrypt(ciphertext []byte, key []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    DealWith(err)
+    iv := ciphertext[:aes.BlockSize]
+    plaintext := make([]byte, len(ciphertext[aes.BlockSize:]))
+  	stream := cipher.NewCTR(block, iv)
+  	stream.XORKeyStream(plaintext, ciphertext[aes.BlockSize:])
+    return plaintext, nil
 }
 
+// DecryptWithIV decrypts []byte 'ciphertext' with []byte 'key'
+// using the Counter Mode of AES, and Initialization Vector []byte 'iv'
+// Only use this method if the IV is not prepended to the ciphertext
+func (c *CTR) DecryptWithIV(ciphertext []byte, key []byte, iv []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    DealWith(err)
+    if len(iv) < aes.BlockSize {
+        var message bytes.Buffer
+        message.WriteString("Invalid IV: \r\n AES requires an Initialization Vector of ")
+	    message.WriteString(string(aes.BlockSize)) 
+        message.WriteString("bytes, but received an IV of only ")
+        message.WriteString(string(len(iv)))
+        message.WriteString("bytes. ")
+        return nil, Errors.NewCryptoError(Errors.InsufficientIVLength, message.String())
+    }
+    plaintext := make([]byte, len(ciphertext[aes.BlockSize:]))
+  	stream := cipher.NewCTR(block, iv[:aes.BlockSize])
+  	stream.XORKeyStream(plaintext, ciphertext[aes.BlockSize:])
+    return plaintext, nil
+}
 
 
 func DealWith(e error) {
@@ -92,3 +111,9 @@ func (d *Decryptor) Decrypt(v interface{}) error {
 
 	return d.err
 }
+
+
+
+
+
+

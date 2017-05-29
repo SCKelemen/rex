@@ -8,13 +8,14 @@ import (
 	"strings"
 	"github.com/urfave/cli"
 
-	 aes "github.com/SCKelemen/rex/AES"
+	 
+   router "github.com/SCKelemen/rex/router"
 )
 
 func main() {
 	app := cli.NewApp()
   app.Name = "rex"
-
+  r := router.NewRouter(nil)
 
 
  	app.Commands = []cli.Command{
@@ -26,18 +27,14 @@ func main() {
           Name:  "encrypt",
           Usage: "Encrypts a files with AES",
           Action: func(c *cli.Context) error {
-            fmt.Println("Encrypting File: ", c.Args().First())
-			ctr := aes.CTR{}
-			var hellostring = []byte("hello string")
-			var keybytes = []byte("example key 1234")
-			
-			fmt.Printf("%s\n", hellostring)
-			text := ctr.Encrypt(hellostring, keybytes)
-			fmt.Printf("%s\n", text)
-			text2 := ctr.Decrypt(text, keybytes)
-			fmt.Printf("%s\n", text2)
-			EncryptToFile("/Users/Kelemen/Desktop/test.txt")
+            k := []byte("example key 1234")
+            cip := r.NewAESRouter().CTR.Encrypt([]byte("hello string"), k)
+             p := r.NewAESRouter().CTR.Decrypt(cip, k)
+           //plain := r.NewAESRouter().CTR.Decrypt(cipher, []byte("example key 1234"))
+             fmt.Printf("cipher: %s\n", cip)
+              fmt.Printf("plain: %s\n", p)
 
+  
             return nil
           },
         },
@@ -140,3 +137,6 @@ func (d *Decryptor) Decrypt(v interface{}) error {
 
 	return d.err
 }
+
+
+
